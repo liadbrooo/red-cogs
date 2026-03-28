@@ -1,5 +1,6 @@
-from redbot.core import commands, Config
 import time
+import discord
+from redbot.core import commands, Config
 
 class SupportPing(commands.Cog):
     """Pingt ein Team, wenn jemand den Support-Warteraum betritt."""
@@ -20,6 +21,9 @@ class SupportPing(commands.Cog):
 
         self.config.register_guild(**default_guild)
 
+    # --------------------
+    # Listener
+    # --------------------
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
         if not after.channel:
@@ -34,16 +38,16 @@ class SupportPing(commands.Cog):
         if after.channel.id != data["voice_channel"]:
             return
 
-        # Nur wenn wirklich neu gejoint
+        # Nur reagieren, wenn tatsächlich neu gejoint
         if before.channel and before.channel.id == after.channel.id:
             return
 
-        # Nur pingen wenn Channel vorher leer war
+        # Optional: Nur wenn Channel vorher leer war
         if data["only_if_empty"]:
             if len(after.channel.members) > 1:
                 return
 
-        # Cooldown
+        # Cooldown prüfen
         now = time.time()
         if now - data["last_ping"] < data["cooldown"]:
             return
@@ -58,9 +62,8 @@ class SupportPing(commands.Cog):
             await self.config.guild(guild).last_ping.set(now)
 
     # --------------------
-    # ⚙️ Commands
+    # Commands
     # --------------------
-
     @commands.group()
     @commands.admin()
     async def supportping(self, ctx):
@@ -69,19 +72,19 @@ class SupportPing(commands.Cog):
             await ctx.send("Nutze Subcommands wie setvoice, settext, setrole...")
 
     @supportping.command()
-    async def setvoice(self, ctx, channel):
+    async def setvoice(self, ctx, channel: discord.VoiceChannel):
         """Setze den Voice Channel"""
         await self.config.guild(ctx.guild).voice_channel.set(channel.id)
         await ctx.send(f"✅ Voice Channel gesetzt: {channel.mention}")
 
     @supportping.command()
-    async def settext(self, ctx, channel):
+    async def settext(self, ctx, channel: discord.TextChannel):
         """Setze den Text Channel"""
         await self.config.guild(ctx.guild).text_channel.set(channel.id)
         await ctx.send(f"✅ Text Channel gesetzt: {channel.mention}")
 
     @supportping.command()
-    async def setrole(self, ctx, role):
+    async def setrole(self, ctx, role: discord.Role):
         """Setze die Rolle"""
         await self.config.guild(ctx.guild).role.set(role.id)
         await ctx.send(f"✅ Rolle gesetzt: {role.mention}")
@@ -110,12 +113,16 @@ class SupportPing(commands.Cog):
         """Zeigt aktuelle Einstellungen"""
         data = await self.config.guild(ctx.guild).all()
 
+        vc = self.bot.get_channel(data['voice_channel'])
+        tc = self.bot.get_channel(data['text_channel'])
+        role = discord.utils.get(ctx.guild.roles, id=data['role']) if data['role'] else None
+
         await ctx.send(
             f"📊 **SupportPing Status**\n"
             f"Enabled: {data['enabled']}\n"
             f"Cooldown: {data['cooldown']}s\n"
             f"Only if empty: {data['only_if_empty']}\n"
-            f"Voice Channel: {data['voice_channel']}\n"
-            f"Text Channel: {data['text_channel']}\n"
-            f"Role: {data['role']}"
+            f"Voice Channel: {vc.mention if vc else 'Nicht gesetzt'}\n"
+            f"Text Channel: {tc.mention if tc else 'Nicht gesetzt'}\n"
+            f"Role: {role.mention if role else 'Nicht gesetzt'}"
         )
