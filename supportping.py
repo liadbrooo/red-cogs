@@ -2,6 +2,8 @@ import time
 import discord
 from redbot.core import commands, Config
 
+__version__ = "1.1.0"  # hier kannst du die Version ändern
+
 class SupportPing(commands.Cog):
     """Pingt ein Team, wenn jemand den Support-Warteraum betritt."""
 
@@ -38,7 +40,7 @@ class SupportPing(commands.Cog):
         if after.channel.id != data["voice_channel"]:
             return
 
-        # Nur reagieren, wenn tatsächlich neu gejoint
+        # Nur reagieren, wenn wirklich neu gejoint
         if before.channel and before.channel.id == after.channel.id:
             return
 
@@ -69,7 +71,10 @@ class SupportPing(commands.Cog):
     async def supportping(self, ctx):
         """SupportPing Einstellungen"""
         if ctx.invoked_subcommand is None:
-            await ctx.send("Nutze Subcommands wie setvoice, settext, setrole...")
+            await ctx.send(
+                "Nutze Subcommands: setvoice, settext, setrole, toggle, cooldown, "
+                "onlyifempty, status, version"
+            )
 
     @supportping.command()
     async def setvoice(self, ctx, channel: discord.VoiceChannel):
@@ -99,6 +104,8 @@ class SupportPing(commands.Cog):
     @supportping.command()
     async def cooldown(self, ctx, seconds: int):
         """Cooldown in Sekunden"""
+        if seconds < 0:
+            return await ctx.send("❌ Cooldown muss ≥ 0 sein")
         await self.config.guild(ctx.guild).cooldown.set(seconds)
         await ctx.send(f"⏱ Cooldown gesetzt auf {seconds}s")
 
@@ -126,3 +133,8 @@ class SupportPing(commands.Cog):
             f"Text Channel: {tc.mention if tc else 'Nicht gesetzt'}\n"
             f"Role: {role.mention if role else 'Nicht gesetzt'}"
         )
+
+    @supportping.command()
+    async def version(self, ctx):
+        """Zeigt die aktuelle Version des Cogs an"""
+        await ctx.send(f"📦 SupportPing Version: {__version__}")
