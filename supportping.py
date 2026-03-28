@@ -2,7 +2,7 @@ import time
 import discord
 from redbot.core import commands, Config
 
-__version__ = "1.1.0"  # hier kannst du die Version ändern
+__version__ = "1.2.0"  # Cog-Version
 
 class SupportPing(commands.Cog):
     """Pingt ein Team, wenn jemand den Support-Warteraum betritt."""
@@ -40,14 +40,12 @@ class SupportPing(commands.Cog):
         if after.channel.id != data["voice_channel"]:
             return
 
-        # Nur reagieren, wenn wirklich neu gejoint
         if before.channel and before.channel.id == after.channel.id:
             return
 
-        # Optional: Nur wenn Channel vorher leer war
-        if data["only_if_empty"]:
-            if len(after.channel.members) > 1:
-                return
+        # Optional: nur wenn Channel vorher leer war
+        if data["only_if_empty"] and len(after.channel.members) > 1:
+            return
 
         # Cooldown prüfen
         now = time.time()
@@ -76,24 +74,61 @@ class SupportPing(commands.Cog):
                 "onlyifempty, status, version"
             )
 
+    # --- Set Voice Channel ---
     @supportping.command()
-    async def setvoice(self, ctx, channel: discord.VoiceChannel):
-        """Setze den Voice Channel"""
-        await self.config.guild(ctx.guild).voice_channel.set(channel.id)
-        await ctx.send(f"✅ Voice Channel gesetzt: {channel.mention}")
+    async def setvoice(self, ctx, channel):
+        """Setze den Voice Channel per Mention oder ID"""
+        vc = None
+        if isinstance(channel, discord.VoiceChannel):
+            vc = channel
+        else:
+            try:
+                channel_id = int(str(channel).replace("<#", "").replace(">", ""))
+                vc = ctx.guild.get_channel(channel_id)
+                if not isinstance(vc, discord.VoiceChannel):
+                    return await ctx.send("❌ Die ID ist kein Voice Channel")
+            except:
+                return await ctx.send("❌ Ungültiger Channel")
+        await self.config.guild(ctx.guild).voice_channel.set(vc.id)
+        await ctx.send(f"✅ Voice Channel gesetzt: {vc.mention}")
 
+    # --- Set Text Channel ---
     @supportping.command()
-    async def settext(self, ctx, channel: discord.TextChannel):
-        """Setze den Text Channel"""
-        await self.config.guild(ctx.guild).text_channel.set(channel.id)
-        await ctx.send(f"✅ Text Channel gesetzt: {channel.mention}")
+    async def settext(self, ctx, channel):
+        """Setze den Text Channel per Mention oder ID"""
+        tc = None
+        if isinstance(channel, discord.TextChannel):
+            tc = channel
+        else:
+            try:
+                channel_id = int(str(channel).replace("<#", "").replace(">", ""))
+                tc = ctx.guild.get_channel(channel_id)
+                if not isinstance(tc, discord.TextChannel):
+                    return await ctx.send("❌ Die ID ist kein Text Channel")
+            except:
+                return await ctx.send("❌ Ungültiger Channel")
+        await self.config.guild(ctx.guild).text_channel.set(tc.id)
+        await ctx.send(f"✅ Text Channel gesetzt: {tc.mention}")
 
+    # --- Set Role ---
     @supportping.command()
-    async def setrole(self, ctx, role: discord.Role):
-        """Setze die Rolle"""
-        await self.config.guild(ctx.guild).role.set(role.id)
-        await ctx.send(f"✅ Rolle gesetzt: {role.mention}")
+    async def setrole(self, ctx, role):
+        """Setze die Rolle per Mention oder ID"""
+        r = None
+        if isinstance(role, discord.Role):
+            r = role
+        else:
+            try:
+                role_id = int(str(role).replace("<@&", "").replace(">", ""))
+                r = discord.utils.get(ctx.guild.roles, id=role_id)
+                if not r:
+                    return await ctx.send("❌ Ungültige Rolle")
+            except:
+                return await ctx.send("❌ Ungültige Rolle")
+        await self.config.guild(ctx.guild).role.set(r.id)
+        await ctx.send(f"✅ Rolle gesetzt: {r.mention}")
 
+    # --- Toggle ---
     @supportping.command()
     async def toggle(self, ctx):
         """Ein/Aus"""
@@ -101,6 +136,7 @@ class SupportPing(commands.Cog):
         await self.config.guild(ctx.guild).enabled.set(not current)
         await ctx.send(f"🔁 Aktiv: {not current}")
 
+    # --- Cooldown ---
     @supportping.command()
     async def cooldown(self, ctx, seconds: int):
         """Cooldown in Sekunden"""
@@ -109,17 +145,18 @@ class SupportPing(commands.Cog):
         await self.config.guild(ctx.guild).cooldown.set(seconds)
         await ctx.send(f"⏱ Cooldown gesetzt auf {seconds}s")
 
+    # --- Only if empty ---
     @supportping.command()
     async def onlyifempty(self, ctx, value: bool):
         """Nur pingen wenn Channel leer war"""
         await self.config.guild(ctx.guild).only_if_empty.set(value)
         await ctx.send(f"👥 Nur wenn leer: {value}")
 
+    # --- Status ---
     @supportping.command()
     async def status(self, ctx):
         """Zeigt aktuelle Einstellungen"""
         data = await self.config.guild(ctx.guild).all()
-
         vc = self.bot.get_channel(data['voice_channel'])
         tc = self.bot.get_channel(data['text_channel'])
         role = discord.utils.get(ctx.guild.roles, id=data['role']) if data['role'] else None
@@ -134,6 +171,7 @@ class SupportPing(commands.Cog):
             f"Role: {role.mention if role else 'Nicht gesetzt'}"
         )
 
+    # --- Version ---
     @supportping.command()
     async def version(self, ctx):
         """Zeigt die aktuelle Version des Cogs an"""
